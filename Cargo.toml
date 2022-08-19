@@ -6,6 +6,8 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 bevy = { version = "0.8", features = ["dynamic"] }
+bevy_rapier3d ={ version = "0.16.1", features = ["simd-stable", "parallel"] }
+smooth-bevy-cameras = { git = "https://github.com/bonsairobo/smooth-bevy-cameras", rev = "a1095b9" }
 
 # Enable a small amount of optimization in debug mode
 [profile.dev]
