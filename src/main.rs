@@ -1,4 +1,16 @@
-use bevy::prelude::*;
+#[cfg(feature = "editor")]
+use bevy::diagnostic::{EntityCountDiagnosticsPlugin, FrameTimeDiagnosticsPlugin};
+use bevy::{
+    asset::AssetServerSettings,
+    prelude::*,
+    render::settings::{WgpuFeatures, WgpuSettings},
+    window::PresentMode,
+};
+#[cfg(feature = "editor")]
+use bevy_editor_pls::{
+    controls::{self, EditorControls},
+    EditorPlugin,
+};
 use bevy_rapier3d::prelude::*;
 use smooth_bevy_cameras::{
     controllers::fps::{FpsCameraBundle, FpsCameraController, FpsCameraPlugin},
@@ -6,14 +18,43 @@ use smooth_bevy_cameras::{
 };
 
 fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugin(LookTransformPlugin)
-        .add_plugin(FpsCameraPlugin::default())
-        .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
-        .add_startup_system(setup)
-        .run();
+    let mut app = App::new();
+
+    app.insert_resource(WindowDescriptor {
+        width: 1280.0,
+        height: 720.0,
+        title: String::from("Bevy Jam 2.0 - Combine"),
+        present_mode: PresentMode::Fifo,
+        resizable: false,
+        decorations: false,
+        ..default()
+    })
+    .insert_resource(AssetServerSettings {
+        watch_for_changes: true,
+        ..default()
+    })
+    .insert_resource(WgpuSettings {
+        features: WgpuFeatures::POLYGON_MODE_LINE,
+        ..default()
+    })
+    .add_plugins(DefaultPlugins)
+    .add_plugin(RapierPhysicsPlugin::<NoUserData>::default());
+
+    #[cfg(feature = "editor")]
+    app.add_plugin(FrameTimeDiagnosticsPlugin)
+        .add_plugin(EntityCountDiagnosticsPlugin)
+        .add_plugin(EditorPlugin)
+        .insert_resource(editor_controls())
+        .add_startup_system(set_cam3d_controls);
+
+    app.add_plugin(LookTransformPlugin)
+        .add_plugin(FpsCameraPlugin::default());
+
+    app.add_startup_system(setup).run();
 }
+
+const EYE: Vec3 = Vec3::from_array([-3.0, 3.0, 10.0]);
+const TARGET: Vec3 = Vec3::ZERO;
 
 fn setup(
     mut commands: Commands,
@@ -22,13 +63,13 @@ fn setup(
 ) {
     commands
         .spawn_bundle(Camera3dBundle {
-            transform: Transform::from_xyz(-3.0, 3.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
-            ..Default::default()
+            transform: Transform::from_translation(EYE).looking_at(TARGET, Vec3::Y),
+            ..default()
         })
         .insert_bundle(FpsCameraBundle::new(
             FpsCameraController::default(),
-            Vec3::new(-2.0, 5.0, 5.0),
-            Vec3::new(0., 0., 0.),
+            EYE,
+            TARGET,
         ));
 
     commands
@@ -68,4 +109,31 @@ fn setup(
             transform: Transform::from_xyz(0.0, 4.0, 0.0),
             ..default()
         });
+}
+
+#[cfg(feature = "editor")]
+fn editor_controls() -> EditorControls {
+    let mut editor_controls = EditorControls::default_bindings();
+    editor_controls.unbind(controls::Action::PlayPauseEditor);
+
+    editor_controls.insert(
+        controls::Action::PlayPauseEditor,
+        controls::Binding {
+            input: controls::UserInput::Single(controls::Button::Keyboard(KeyCode::Escape)),
+            conditions: vec![controls::BindingCondition::ListeningForText(false)],
+        },
+    );
+
+    editor_controls
+}
+
+#[cfg(feature = "editor")]
+fn set_cam3d_controls(
+    mut query: Query<
+        &mut bevy_editor_pls::default_windows::cameras::camera_3d_free::FlycamControls,
+    >,
+) {
+    let mut controls = query.single_mut();
+    controls.key_up = KeyCode::E;
+    controls.key_down = KeyCode::Q;
 }
